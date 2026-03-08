@@ -1,7 +1,3 @@
-Below is a **clean, detailed README.md** you can place in your repository. It explains the project, experiments, ablations, and usage in clear human English.
-
----
-
 # RKHS Scheduler
 
 **Retrieval-Augmented Kernel-Based Heuristic Synthesis for DAG Scheduling**
@@ -375,3 +371,4 @@ This implementation was developed as part of research on:
 **AI-assisted heuristic synthesis for scheduling and design automation.**
 
 The framework explores how machine learning methods can assist in designing algorithms while preserving interpretability and algorithmic transparency.
+
