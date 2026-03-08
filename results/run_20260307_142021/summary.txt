@@ -1,0 +1,26 @@
+RKHS Scheduler Experiment Summary
+========================================
+
+Configuration:
+- task_sizes: [20, 50, 100]
+- processor_counts: [2, 4, 8]
+- graphs_per_setting: 50
+- train_ratio: 0.8
+- edge_prob: 0.2
+- n_trials: 50
+- ablations: ['full_rkhs', 'no_bo', 'fixed_features_bo', 'fixed_features_no_bo']
+- graph_families: ['random', 'erdos_renyi', 'barabasi_albert', 'watts_strogatz']
+- total_expected_dags: 7200
+
+Results:
+- Total DAGs tested: 1440
+- Average HEFT makespan: 394.417
+- Average CPOP makespan: 439.639
+- Average RKHS_BO makespan: 409.044
+- RKHS_BO better than HEFT on: 285 DAGs
+- RKHS_BO better than CPOP on: 840 DAGs
+- RKHS_BO equal to HEFT on: 500 DAGs
+- RKHS_BO equal to CPOP on: 392 DAGs
+
+Interpretation:
+- RKHS_BO outperformed CPOP on average, but not necessarily HEFT.

@@ -1,0 +1,15 @@
+{
+    "task_sizes": [
+        20,
+        50,
+        100
+    ],
+    "processor_counts": [
+        2,
+        4,
+        8
+    ],
+    "graphs_per_setting": 50,
+    "edge_prob": 0.2,
+    "total_expected_dags": 450
+}

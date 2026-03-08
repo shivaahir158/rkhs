@@ -1,0 +1,6 @@
+networkx
+optuna
+numpy
+pandas
+matplotlib
+openai

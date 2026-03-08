@@ -1,0 +1,10 @@
+{
+    "total_dags": 360,
+    "avg_HEFT": 310.4888888888889,
+    "avg_CPOP": 369.2111111111111,
+    "avg_RKHS_BO": 328.85277777777776,
+    "rkhs_better_than_heft": 67,
+    "rkhs_better_than_cpop": 253,
+    "rkhs_equal_heft": 95,
+    "rkhs_equal_cpop": 54
+}
