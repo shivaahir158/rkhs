@@ -19,7 +19,7 @@ Implementation of the RKHS framework from [arXiv:2604.26153v1](https://arxiv.org
 > }
 > ```
 >
-> We'd love to hear how you're using RKHS. Suggestions, feedback, and collaboration ideas are always welcome — feel free to reach out at **shiva.ahir@stonybrook.edu**
+> We'd love to hear how you're using RKHS. Suggestions, feedback, and collaboration ideas are always welcome, feel free to reach out at **shiva.ahir@stonybrook.edu**
 
 ---
 
