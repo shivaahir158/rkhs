@@ -15,7 +15,7 @@ Implementation of the RKHS framework, check out our work at [arXiv:2604.26153v1]
 >          for Hardware Design},
 >   author={Ahir, Shiva and Doboli, Alex},
 >   journal={arXiv preprint arXiv:2604.26153},
->   year={2025}
+>   year={2026}
 > }
 > ```
 >
@@ -271,18 +271,4 @@ results/run_YYYYMMDD_HHMMSS/
 | **No Retrieval** | None | None | Yes (no kernel context) |
 | **No Motif** | Similarity-based | Signatures stripped | Yes |
 | **Random Kernel** | Random selection | Full signatures + templates | Yes |
-
----
-
-## Citation
-
-```bibtex
-@article{ahir2025rkhs,
-  title={RAG-Enhanced Kernel-Based Heuristic Synthesis (RKHS):
-         A Structured Methodology Using Large Language Models
-         for Hardware Design},
-  author={Ahir, Shiva and Doboli, Alex},
-  journal={arXiv preprint arXiv:2604.26153},
-  year={2025}
-}
 ```
