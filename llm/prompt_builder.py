@@ -1,69 +1,126 @@
-def build_prompt(num_tasks, num_processors, edge_prob, num_train_graphs, graph_family=None):
-    family_guidance = ""
-    if graph_family == "barabasi_albert":
-        family_guidance = """
-Topology hint:
-- This is a scale-free graph family.
-- Prefer hub-sensitive and branching-aware features such as fork, in_degree, out_degree, or communication-related structure.
 """
-    elif graph_family == "watts_strogatz":
-        family_guidance = """
-Topology hint:
-- This is a small-world graph family.
-- Prefer clustered/local structural features such as depth, in_degree, and communication-aware structure.
-"""
-    elif graph_family == "erdos_renyi":
-        family_guidance = """
-Topology hint:
-- This is a random graph family.
-- Prefer balanced combinations of rank-based and structural features.
-"""
-    else:
-        family_guidance = """
-Topology hint:
-- Use a balanced combination of rank-based and structural features.
+RAG-augmented prompt construction for RKHS (Steps 4-5 in Algorithm 1).
+
+Constructs structured prompts containing:
+- Target graph statistics
+- Retrieved kernel motifs and heuristic templates
+- Scheduling constraints
+- Previous iteration feedback (if any)
 """
 
-    return f"""
-You are designing an interpretable priority heuristic for DAG scheduling.
 
-Problem setting:
-- Number of tasks: {num_tasks}
-- Number of processors: {num_processors}
-- Edge probability / density proxy: {edge_prob}
-- Number of training DAGs: {num_train_graphs}
-- Graph family: {graph_family}
+def format_kernel_info(retrieved_kernels):
+    """Format retrieved kernels for the prompt."""
+    lines = []
+    for i, (kernel, sim) in enumerate(retrieved_kernels):
+        lines.append(f"\n--- Retrieved Kernel {i+1} (similarity={sim:.3f}) ---")
+        lines.append(f"Motif type: {kernel.motif_type}")
+        lines.append(f"Heuristic template: {kernel.template_desc}")
 
-{family_guidance}
+        sig = kernel.signature
+        lines.append(f"Structural signature:")
+        lines.append(f"  avg_crit={sig['avg_crit']:.2f}, max_crit={sig['max_crit']:.2f}")
+        lines.append(f"  avg_fanout={sig['avg_fanout']:.2f}, max_fanout={sig['max_fanout']:.2f}")
+        lines.append(f"  high_fanout_ratio={sig['high_fanout_ratio']:.3f}")
+        lines.append(f"  reconvergence_ratio={sig['reconv_ratio']:.3f}")
+        lines.append(f"  chain_ratio={sig['chain_ratio']:.3f}")
+        lines.append(f"  num_levels={sig['num_levels']:.1f}")
+        lines.append(f"  edge_density={sig['edge_density']:.3f}")
+    return "\n".join(lines)
 
-Goal:
-Generate a compact priority function for list scheduling that is:
-1. deterministic
-2. interpretable
-3. different from plain HEFT/CPOP-style upward-rank-only priority
-4. suitable for heterogeneous DAG scheduling
 
-Available features:
-- rank_u
-- rank_d
-- depth
-- in_degree
-- out_degree
-- fork
-- comm_weight
+def format_graph_stats(dag, node_features):
+    """Format target graph statistics for the prompt."""
+    n = dag.num_nodes
+    crit_vals = [node_features[v]["crit"] for v in node_features]
+    fanout_vals = [node_features[v]["fanout"] for v in node_features]
+    level_vals = [node_features[v]["level"] for v in node_features]
 
-Hard constraints:
-- Do NOT return only rank_u
-- Do NOT return only rank_u and rank_d
-- Do NOT return a heuristic equivalent to HEFT or CPOP
-- Use 3 to 5 features
-- Include at least one structural feature from: depth, in_degree, out_degree, fork, comm_weight
-- Prefer feature combinations that behave differently across graph topologies
+    from collections import Counter
+    type_counts = Counter(dag.operations[v].op_type for v in dag.operations)
 
-Output rule:
-Return ONLY a comma-separated list of feature names.
-No prose. No explanation. No equation.
+    lines = [
+        f"Number of operations: {n}",
+        f"Number of edges: {len(dag.edges)}",
+        f"Critical path range: [{min(crit_vals)}, {max(crit_vals)}]",
+        f"Max fanout: {max(fanout_vals)}",
+        f"Number of levels: {max(level_vals) + 1}",
+        f"Operation type distribution: {dict(type_counts)}",
+        f"Resource limits: {dag.resource_limits}",
+    ]
+    return "\n".join(lines)
 
-Example valid output:
-rank_u,depth,fork,comm_weight
+
+def build_synthesis_prompt(
+    dag,
+    node_features,
+    retrieved_kernels,
+    feedback=None,
+    iteration=0,
+):
+    """
+    Build the RAG-augmented synthesis prompt (Step 4).
+
+    The LLM generates executable Python code defining:
+        def priority(v, features, dag) -> float
+    """
+    graph_stats = format_graph_stats(dag, node_features)
+    kernel_info = format_kernel_info(retrieved_kernels)
+
+    feedback_section = ""
+    if feedback:
+        feedback_section = f"""
+## Previous Iteration Feedback
+{feedback}
+Use this feedback to improve your priority function. Fix any issues mentioned.
 """
+
+    prompt = f"""You are an expert in high-level synthesis (HLS) scheduling.
+
+## Task
+Generate a compact, deterministic Python priority function for resource-constrained
+list scheduling. The scheduler selects ready operations by descending priority score.
+
+## Target Graph Statistics
+{graph_stats}
+
+## Retrieved Kernel Motifs (from similar training graphs)
+{kernel_info}
+
+## Scheduling Constraints
+- Operations have types (ALU, MUL, MEM, CTRL) with per-type resource limits.
+- Each operation has duration d(v) = 1.
+- Precedence constraints: operation v cannot start before all predecessors finish.
+- Resource constraint: at most R_t operations of type t can execute per cycle.
+- Goal: minimize makespan (total schedule length).
+{feedback_section}
+## Available Features
+Each node v has pre-computed features accessible via features[v]:
+- "crit": remaining critical-path length to sink (float)
+- "fanout": number of successors (int)
+- "level": longest path from source (int)
+- "slack": ALAP - ASAP scheduling flexibility (float)
+- "reconvergence": reconvergence marker R(v) (int)
+- "in_degree": number of predecessors (int)
+- "out_degree": number of successors (int)
+- "op_type": operation type string
+
+## Output Format
+Return ONLY a Python function definition. No explanation, no imports.
+The function must be:
+1. Deterministic
+2. Interpretable (simple arithmetic on features)
+3. Compatible with list scheduling
+
+```python
+def priority(v, features, dag):
+    f = features[v]
+    # Your priority computation here
+    return score
+```
+
+Iteration {iteration + 1}: Generate the best priority function based on the
+retrieved kernels and graph structure. Combine complementary signals like
+criticality, fanout, reconvergence, and resource pressure.
+"""
+    return prompt

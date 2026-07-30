@@ -1,47 +1,89 @@
-def earliest_start_time(dag, task_id, proc, schedule, proc_free_time):
-    preds = dag.predecessors.get(task_id, [])
-    pred_ready = 0.0
+"""
+Resource-constrained list scheduling (Section 1.2, Eqs. 1-4).
 
-    for pred in preds:
-        pred_proc, pred_start, pred_finish = schedule[pred]
-        transfer = 0.0 if pred_proc == proc else dag.edges[(pred, task_id)]
-        pred_ready = max(pred_ready, pred_finish + transfer)
+Iteratively selects ready operations subject to precedence and resource
+constraints, using a priority function pi(v) to rank candidates.
+"""
 
-    return max(proc_free_time[proc], pred_ready)
+import time
+from core.dag import DAG
 
-def eft(dag, task_id, proc, schedule, proc_free_time):
-    est = earliest_start_time(dag, task_id, proc, schedule, proc_free_time)
-    finish = est + dag.tasks[task_id].comp_costs[proc]
-    return est, finish
 
-def list_schedule(dag, processors, priority_scores):
-    unscheduled = set(dag.tasks.keys())
-    ready = {v for v in dag.tasks if len(dag.predecessors.get(v, [])) == 0}
+def compute_ready_set(dag, scheduled, cycle):
+    """Ready set R(c) at cycle c (Eq. 4)."""
+    ready = []
+    for v in dag.operations:
+        if v in scheduled:
+            continue
+        preds = dag.predecessors.get(v, [])
+        if all(u in scheduled and scheduled[u] + dag.operations[u].duration <= cycle
+               for u in preds):
+            ready.append(v)
+    return ready
+
+
+def list_schedule(dag, priority_fn, node_features=None):
+    """
+    Resource-constrained list scheduling (Section 1.2).
+
+    Args:
+        dag: The DAG to schedule.
+        priority_fn: Function pi(v, features, dag) -> float.
+        node_features: Pre-computed node features dict.
+
+    Returns:
+        (schedule, makespan, is_feasible)
+    """
     schedule = {}
-    proc_free_time = {p: 0.0 for p in processors}
+    max_cycles = dag.num_nodes * 10
+    cycle = 0
 
-    while unscheduled:
-        selected = max(ready, key=lambda x: priority_scores[x])
-        ready.remove(selected)
+    while len(schedule) < dag.num_nodes and cycle < max_cycles:
+        ready = compute_ready_set(dag, schedule, cycle)
+        if not ready:
+            cycle += 1
+            continue
 
-        best_proc = None
-        best_start = None
-        best_finish = float("inf")
+        # Sort by priority descending, ID for tie-breaking
+        ready.sort(key=lambda v: (-priority_fn(v, node_features, dag), v))
 
-        for p in processors:
-            start, finish = eft(dag, selected, p, schedule, proc_free_time)
-            if finish < best_finish:
-                best_proc = p
-                best_start = start
-                best_finish = finish
+        # Count active ops per type at this cycle
+        active_counts = {}
+        for v, start in schedule.items():
+            if start <= cycle < start + dag.operations[v].duration:
+                t = dag.operations[v].op_type
+                active_counts[t] = active_counts.get(t, 0) + 1
 
-        schedule[selected] = (best_proc, best_start, best_finish)
-        proc_free_time[best_proc] = best_finish
-        unscheduled.remove(selected)
+        for v in ready:
+            if v in schedule:
+                continue
+            t = dag.operations[v].op_type
+            limit = dag.resource_limits.get(t, 1)
+            current = active_counts.get(t, 0)
+            if current < limit:
+                schedule[v] = cycle
+                active_counts[t] = current + 1
 
-        for succ in dag.successors.get(selected, []):
-            if succ in unscheduled and all(pred in schedule for pred in dag.predecessors[succ]):
-                ready.add(succ)
+        cycle += 1
 
-    makespan = max(item[2] for item in schedule.values()) if schedule else 0.0
-    return schedule, makespan
+    if schedule:
+        makespan = max(schedule[v] + dag.operations[v].duration for v in schedule)
+    else:
+        makespan = 0
+
+    is_feasible = len(schedule) == dag.num_nodes
+    return schedule, makespan, is_feasible
+
+
+def run_with_timing(dag, priority_fn, node_features=None):
+    """Run list scheduling and return (schedule, makespan, runtime_ms, is_feasible)."""
+    start = time.perf_counter()
+    schedule, makespan, is_feasible = list_schedule(dag, priority_fn, node_features)
+    runtime_ms = (time.perf_counter() - start) * 1000
+    return schedule, makespan, runtime_ms, is_feasible
+
+
+def compute_score(makespan, runtime_ms, is_feasible, lam=0.01, mu=5000):
+    """J(H; G) = -L(s_H(G)) - lambda * T_run(H,G) - mu * [infeasible]  (Eq. 9)"""
+    penalty = 0 if is_feasible else mu
+    return -makespan - lam * runtime_ms - penalty

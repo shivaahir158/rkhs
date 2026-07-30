@@ -1,0 +1,44 @@
+{
+  "baseline_avg_latency": 17.3,
+  "baseline_std": 7.907591289387685,
+  "rkhs_avg_latency": 15.94,
+  "improvement_pct": 7.861271676300586,
+  "iterations": [
+    {
+      "iter": 0,
+      "avg_latency": 17.3,
+      "j_bar": -17.30179563900456,
+      "code": "pi(v) = level(v)"
+    },
+    {
+      "iter": 1,
+      "avg_latency": 15.96,
+      "j_bar": -15.961725635118782,
+      "code": "pi(v) = crit(v) + 0.8*fanout(v) - 0.3*level(v)"
+    },
+    {
+      "iter": 2,
+      "avg_latency": 15.94,
+      "j_bar": -15.941723761763424,
+      "code": "pi(v) = crit(v) + 0.5*fanout(v) - 0.3*level(v)"
+    }
+  ],
+  "ablation": {
+    "Full RKHS": {
+      "avg_latency": 15.94,
+      "std": 6.827620376090047
+    },
+    "No Retrieval": {
+      "avg_latency": 15.96,
+      "std": 6.814572620494993
+    },
+    "No Motif": {
+      "avg_latency": 16.04,
+      "std": 6.902057664204204
+    },
+    "Random Kernel": {
+      "avg_latency": 16.38,
+      "std": 6.991108638835475
+    }
+  }
+}
