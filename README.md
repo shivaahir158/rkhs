@@ -6,6 +6,23 @@ Implementation of the RKHS framework from [arXiv:2604.26153v1](https://arxiv.org
 
 ---
 
+> **If you find our work useful and want to build on it for your own ideas, please cite us:**
+>
+> ```bibtex
+> @article{ahir2025rkhs,
+>   title={RAG-Enhanced Kernel-Based Heuristic Synthesis (RKHS):
+>          A Structured Methodology Using Large Language Models
+>          for Hardware Design},
+>   author={Ahir, Shiva and Doboli, Alex},
+>   journal={arXiv preprint arXiv:2604.26153},
+>   year={2025}
+> }
+> ```
+>
+> We'd love to hear how you're using RKHS. Suggestions, feedback, and collaboration ideas are always welcome — feel free to reach out at **shiva.ahir@stonybrook.edu**
+
+---
+
 ## Key Results
 
 | Metric | Value |
