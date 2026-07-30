@@ -1,374 +1,271 @@
-# RKHS Scheduler
+# RKHS: RAG-Enhanced Kernel-Based Heuristic Synthesis
 
-**Retrieval-Augmented Kernel-Based Heuristic Synthesis for DAG Scheduling**
+**A Structured Methodology Using Large Language Models for Hardware Design**
 
-This repository contains the experimental implementation of **RKHS**, a framework that synthesizes interpretable scheduling heuristics for directed acyclic graph (DAG) task scheduling using structural graph features, large language models (LLMs), and Bayesian optimization.
-
-The system automatically constructs priority functions for list scheduling and evaluates them against classical scheduling algorithms such as **HEFT** and **CPOP** across a variety of DAG families.
-
-The goal is not to replace classical algorithms outright, but to investigate whether **machine-generated heuristics can adapt to different graph structures while remaining transparent and interpretable**.
+Implementation of the RKHS framework from [arXiv:2604.26153v1](https://arxiv.org/abs/2604.26153), which synthesizes reusable optimization heuristics for resource-constrained list scheduling in high-level synthesis (HLS) using retrieval-augmented generation (RAG), compact kernel heuristic templates, and an LLM-driven refinement loop.
 
 ---
 
-# Project Motivation
+## Key Results
 
-Many classical DAG scheduling algorithms rely on fixed heuristics that work well in average cases but may not adapt well to different graph structures.
+| Metric | Value |
+|--------|-------|
+| Baseline avg latency | 17.30 |
+| RKHS avg latency | 16.02 |
+| Improvement | **7.4%** |
+| Runtime overhead | **1.3x** |
 
-For example:
-
-* **HEFT** prioritizes tasks using upward rank.
-* **CPOP** relies on critical path information.
-
-These rules are designed manually and do not change depending on the structure of the workload.
-
-RKHS explores a different idea:
-
-Instead of designing heuristics manually, we attempt to **synthesize priority functions automatically** using:
-
-1. Structural features extracted from DAGs
-2. LLM-guided feature selection
-3. Bayesian optimization to tune feature weights
-
-The resulting priority functions remain simple and interpretable.
-
-Example priority function:
+**Synthesized priority function (Eq. 11):**
 
 ```
-priority = θ1 * rank_u + θ2 * depth + θ3 * fork + θ4 * comm_weight
+π(v) = α · crit(v) + β · fanout(v) − γ · level(v)
 ```
 
-The framework searches for good combinations of features and weights that lead to better scheduling decisions.
+**Best LLM-generated heuristic (GPT-4):**
+
+```python
+def priority(v, features, dag):
+    f = features[v]
+    return 0.7 * f["crit"] + 0.2 * f["reconvergence"] + 0.1 * f["fanout"]
+```
 
 ---
 
-# Framework Overview
+## Problem Formulation (Section 1.2)
 
-The RKHS pipeline consists of the following steps.
+We consider latency-minimizing list scheduling for HLS — a resource-constrained scheduling problem over a DAG `G = (V, E)`:
 
-### 1. DAG Generation
+- Each node `v` is an operation with type `τ(v) ∈ {ALU, MUL, MEM, CTRL}` and duration `d(v) = 1`
+- Each edge `(u, v)` encodes precedence `u ≺ v`
+- Resource capacities `R_t` limit how many type-t operations execute per cycle
+- **Objective:** minimize makespan `L(s) = max(s(v) + d(v))`
 
-Synthetic DAGs are generated to simulate different workload structures.
-
-Supported graph families:
-
-* Random DAGs
-* Erdős–Rényi graphs
-* Barabási–Albert scale-free graphs
-* Watts–Strogatz small-world graphs
-
-Each graph is converted into a scheduling DAG where:
-
-* nodes represent tasks
-* edges represent dependencies
-* each task has heterogeneous processor execution costs
+**Baseline:** `π_base(v) = level(v)` with deterministic ID tie-breaking.
 
 ---
 
-### 2. Feature Extraction
+## Framework Overview (Algorithm 1)
 
-Structural features are extracted from the DAG.
+```
+Input DAG → Feature/Embedding f(G) → Kernel Retrieval top-m → LLM Synthesis → Schedule & Score
+```
 
-These features capture scheduling-relevant properties of tasks.
+The RKHS pipeline:
 
-Examples include:
+1. **Generate training DAGs** (`|G_train| = 200`) and validation DAGs (`|G_val| = 50`)
+2. **Build kernel library** (`|K| = 50`) by extracting motifs from training DAGs and clustering by structural similarity
+3. **For each iteration** (`N = 3`):
+   - Sample a batch from training DAGs
+   - Retrieve top-`m` kernels via cosine similarity (Eq. 5-6)
+   - Construct RAG-augmented prompt with kernel motifs and templates
+   - Query GPT-4 to synthesize a priority function
+   - Evaluate on validation set using scoring function `J(H; G)` (Eq. 9)
+   - Generate feedback for next iteration (Self-Refine)
+4. **Return** the best heuristic `H*`
 
-* `rank_u` – upward rank used in HEFT
-* `rank_d` – downward rank
-* `depth` – distance from entry node
-* `in_degree` – number of predecessors
-* `out_degree` – number of successors
-* `fork` – branching factor
-* `comm_weight` – communication pressure
+### Hyperparameters
 
-These features form the basis for constructing priority functions.
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `\|K\|` | 50 | Kernel library size |
+| `\|G_train\|` | 200 | Training graphs |
+| `\|G_val\|` | 50 | Validation graphs |
+| `N` | 3 | Synthesis iterations |
+| `m` | 5 | Top-m kernel retrieval |
+| `λ` | 0.01 | Runtime penalty weight |
+| `μ` | 5000 | Infeasibility penalty |
 
 ---
 
-### 3. LLM-Guided Feature Selection
+## Kernel Library (Appendix A)
 
-An LLM is used to propose combinations of features that may produce effective scheduling heuristics.
-
-The model receives:
-
-* graph size information
-* processor count
-* graph family characteristics
-* feature definitions
-
-It returns a list of candidate features.
-
-Example output:
+### Deterministic Embedding (A.1)
 
 ```
-rank_u, depth, fork, comm_weight
+f(G) = [crit-path summary, fanout histogram, level histogram, op-type histogram, resource-pressure proxies]
 ```
 
-These features are then used to build a priority template.
+All features are z-score normalized over `G_train`.
+
+### Motif Extraction (A.2)
+
+Motifs are extracted by mining recurring labeled subgraphs:
+- k-hop neighborhoods
+- High-centrality subgraphs
+- Reconvergent fanout regions
+- Deep linear chains
+
+### Kernel Templates (A.4)
+
+**Kernel A — Reconvergent Region:**
+```
+π(v) = α₁ · crit(v) + α₂ · R(v) + α₃ · fanout(v)
+```
+
+**Kernel B — Deep Critical Chain:**
+```
+π(v) = β₁ · crit(v) − β₂ · slack(v)
+```
+
+### Reconvergence Marker (A.3)
+
+```
+R(v) = |{(u, w) : u, w ∈ children(v), ∃x s.t. u → x ∧ w → x}|
+```
 
 ---
 
-### 4. Bayesian Optimization
+## Node-Level Features
 
-The priority template contains unknown weights:
-
-```
-priority = θ1 f1 + θ2 f2 + ... + θk fk
-```
-
-Bayesian optimization searches for weight values that minimize average makespan on training DAGs.
-
-The optimized weights are then evaluated on unseen DAGs.
-
----
-
-### 5. List Scheduling
-
-Using the synthesized priority function, tasks are scheduled using a standard list scheduling procedure.
-
-The resulting schedules are compared against baseline algorithms.
+| Feature | Description |
+|---------|-------------|
+| `crit(v)` | Remaining critical-path length to sink (Eq. 12) |
+| `fanout(v)` | Number of successors |
+| `level(v)` | Longest path from source |
+| `slack(v)` | ALAP − ASAP scheduling flexibility |
+| `R(v)` | Reconvergence marker |
+| `in_degree` | Number of predecessors |
+| `out_degree` | Number of successors |
+| `op_type` | Operation type (ALU, MUL, MEM, CTRL) |
 
 ---
 
-# Baselines
+## Scoring Function (Eq. 9)
 
-The framework compares RKHS against classical scheduling algorithms.
+```
+J(H; G) = −L(s_H(G)) − λ · T_run(H, G) − μ · [infeasible]
+```
 
-### HEFT
+The mean validation score:
 
-Heterogeneous Earliest Finish Time.
-
-Uses upward rank to determine task priority.
-
-HEFT is widely considered a strong baseline for heterogeneous DAG scheduling.
+```
+J̄(H) = (1/|G_val|) · Σ J(H; G)
+```
 
 ---
 
-### CPOP
+## Experiment Results
 
-Critical Path on a Processor.
+### Table 1: RKHS Synthesis Loop (per iteration)
 
-Prioritizes tasks based on the combined upward and downward ranks.
+| Iter | Latency ↓ | Runtime (ms) ↓ | J̄ ↑ |
+|------|-----------|----------------|------|
+| 0 (Topo+ID) | 16.14 | 0.18 | -16.14 |
+| 1 (Fanout-aware) | **16.02** | 0.18 | **-16.02** |
+| 2 (Zero-in PQ) | 16.12 | 0.20 | -16.12 |
 
----
+### Table 2: Ablation Study
 
-# Ablation Studies
-
-To understand the contribution of each component, several ablations are performed.
-
-## Full RKHS
-
-All components enabled.
-
-* LLM feature selection
-* Structural features
-* Bayesian optimization
-
-This is the complete framework.
+| Graph | Full RKHS | No Retrieval | No Motif | Random Kernel |
+|-------|-----------|--------------|----------|---------------|
+| G1 | 19.0 | 19.0 | 19.0 | 19.0 |
+| G2 | 17.0 | 17.0 | 17.0 | 20.0 |
+| G3 | 16.0 | 16.0 | 16.0 | 16.0 |
+| G4 | 13.0 | 13.0 | 13.0 | 15.0 |
+| **Avg** | **15.94 (±6.83)** | 15.96 (±6.81) | 16.04 (±6.90) | 16.38 (±6.99) |
 
 ---
 
-## RKHS without Bayesian Optimization
-
-LLM feature selection is used, but feature weights are fixed.
-
-This tests whether Bayesian optimization improves heuristic quality.
-
----
-
-## Fixed Features with Bayesian Optimization
-
-LLM feature selection is disabled.
-
-A manually chosen feature set is used instead.
-
-Bayesian optimization still tunes the weights.
-
-This measures the impact of LLM-generated feature sets.
-
----
-
-## Fixed Features without Optimization
-
-Both LLM feature selection and Bayesian optimization are removed.
-
-A static handcrafted priority rule is used.
-
-This represents a traditional manually designed heuristic.
-
----
-
-# Experimental Setup
-
-Experiments are conducted across multiple configurations.
-
-### Task sizes
-
-```
-20
-50
-100
-```
-
-### Processor counts
-
-```
-2
-4
-8
-```
-
-### DAG families
-
-```
-random
-erdos_renyi
-barabasi_albert
-watts_strogatz
-```
-
-### Graphs per configuration
-
-```
-50
-```
-
-Each configuration is split into:
-
-* training DAGs (80%) for optimization
-* testing DAGs (20%) for evaluation
-
----
-
-# Repository Structure
+## Repository Structure
 
 ```
 rkhs_scheduler/
-│
-├── baselines/
-│   ├── heft.py
-│   └── cpop.py
+├── config.py                  # All hyperparameters (Algorithm 1)
+├── main.py                    # Entry point (--offline for no-API mode)
+├── rkhs_loop.py               # Algorithm 1: RKHS synthesis loop
 │
 ├── core/
-│   ├── dag.py
-│   ├── generator.py
-│   ├── features.py
-│   └── priority.py
+│   ├── dag.py                 # DAG with Operation types, resource limits
+│   ├── generator.py           # DAG generation (random, layered, fork-join)
+│   ├── features.py            # Node features + graph embedding f(G)
+│   ├── motifs.py              # Motif extraction, kernel construction
+│   ├── retrieval.py           # Cosine similarity kernel retrieval
+│   ├── scheduler.py           # Resource-constrained list scheduling
+│   └── priority.py            # Priority functions (baseline + synthesized)
 │
 ├── llm/
-│   ├── prompt_builder.py
-│   ├── parser.py
-│   └── openai_client.py
+│   ├── prompt_builder.py      # RAG-augmented prompt construction
+│   ├── parser.py              # Parse/validate LLM-generated code
+│   └── openai_client.py       # GPT-4 API client
 │
-├── optimizer/
-│   └── bayes_opt.py
+├── baselines/
+│   ├── heft.py                # HEFT-style baseline (reference)
+│   └── cpop.py                # CPOP-style baseline (reference)
 │
 ├── experiments/
-│   ├── run_single.py
-│   ├── run_batch.py
-│   └── output_manager.py
+│   ├── run_batch.py           # Full experiment (Tables 1 & 2)
+│   ├── run_offline.py         # Offline mode (no API key needed)
+│   ├── run_single.py          # Single DAG evaluation
+│   └── output_manager.py      # Result file management
 │
-├── results/
-│
-├── main.py
-└── requirements.txt
+├── results/                   # Experiment outputs (JSON)
+├── requirements.txt
+└── .env                       # OpenAI API key (not committed)
 ```
 
 ---
 
-# Running Experiments
+## Running Experiments
 
-Install dependencies:
+### Install dependencies
 
-```
+```bash
 pip install -r requirements.txt
 ```
 
-Run the full experiment:
+### Full experiment (requires OpenAI API key)
 
+```bash
+# Set your API key in .env
+echo "OPENAI_API_KEY=sk-..." > .env
+
+# Run full RKHS with GPT-4 synthesis
+python3 main.py
 ```
-python experiments/run_batch.py
+
+### Offline experiment (no API key needed)
+
+```bash
+python3 main.py --offline
 ```
 
-The script will automatically:
-
-1. generate DAG datasets
-2. run all ablation configurations
-3. evaluate baselines
-4. store experiment outputs
+Uses deterministic heuristic templates from the kernel library instead of LLM synthesis.
 
 ---
 
-# Output Files
+## Output Files
 
-Each run creates a directory inside `results/`.
-
-Example:
+Each run creates a timestamped directory in `results/`:
 
 ```
 results/run_YYYYMMDD_HHMMSS/
-```
-
-Generated files include:
-
-### config.json
-
-Experiment configuration.
-
----
-
-### per_dag_results.csv
-
-Per-graph results including:
-
-* graph family
-* ablation type
-* HEFT makespan
-* CPOP makespan
-* RKHS makespan
-
----
-
-### summary.json
-
-Aggregated statistics.
-
----
-
-### summary.txt
-
-Human-readable summary of the experiment.
-
-Example output:
-
-```
-Average HEFT makespan: 394.417
-Average CPOP makespan: 439.639
-Average RKHS makespan: 409.044
-RKHS better than HEFT on: 285 DAGs
-RKHS equal to HEFT on: 500 DAGs
+├── config.json                # Experiment hyperparameters
+├── table1_iterations.json     # Per-iteration metrics (Table 1)
+└── table2_ablation.json       # Ablation study results (Table 2)
 ```
 
 ---
 
-# Notes on Interpretation
+## Ablation Study Design
 
-RKHS does not necessarily outperform HEFT on every graph.
-
-Instead, the framework demonstrates that:
-
-* automatically synthesized heuristics can match classical algorithms in many cases
-* structural feature combinations influence scheduling behavior
-* adaptive heuristics may outperform traditional ones on specific graph structures
-
-The purpose of this framework is to explore **automated heuristic synthesis** rather than replace established algorithms.
+| Ablation | Retrieval | Motifs | LLM |
+|----------|-----------|--------|-----|
+| **Full RKHS** | Similarity-based | Full signatures + templates | Yes |
+| **No Retrieval** | None | None | Yes (no kernel context) |
+| **No Motif** | Similarity-based | Signatures stripped | Yes |
+| **Random Kernel** | Random selection | Full signatures + templates | Yes |
 
 ---
 
-# Research Context
+## Citation
 
-This implementation was developed as part of research on:
-
-**AI-assisted heuristic synthesis for scheduling and design automation.**
-
-The framework explores how machine learning methods can assist in designing algorithms while preserving interpretability and algorithmic transparency.
-
+```bibtex
+@article{ahir2025rkhs,
+  title={RAG-Enhanced Kernel-Based Heuristic Synthesis (RKHS):
+         A Structured Methodology Using Large Language Models
+         for Hardware Design},
+  author={Ahir, Shiva and Doboli, Alex},
+  journal={arXiv preprint arXiv:2604.26153},
+  year={2025}
+}
+```
