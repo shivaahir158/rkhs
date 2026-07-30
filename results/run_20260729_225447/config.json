@@ -1,0 +1,11 @@
+{
+  "N_TRAIN": 200,
+  "N_VAL": 50,
+  "N_KERNELS": 50,
+  "N_ITERATIONS": 3,
+  "TOP_M": 5,
+  "BATCH_SIZE": 20,
+  "LAMBDA": 0.01,
+  "MU": 5000,
+  "SEED": 42
+}

@@ -1,0 +1,94 @@
+{
+  "full_rkhs": {
+    "avg_latency": 16.02,
+    "std_latency": 6.984239400249679,
+    "per_graph": [
+      {
+        "dag_idx": 0,
+        "makespan": 19
+      },
+      {
+        "dag_idx": 1,
+        "makespan": 17
+      },
+      {
+        "dag_idx": 2,
+        "makespan": 16
+      },
+      {
+        "dag_idx": 3,
+        "makespan": 13
+      }
+    ]
+  },
+  "no_retrieval": {
+    "avg_latency": 15.94,
+    "std_latency": 6.827620376090047,
+    "per_graph": [
+      {
+        "dag_idx": 0,
+        "makespan": 19
+      },
+      {
+        "dag_idx": 1,
+        "makespan": 17
+      },
+      {
+        "dag_idx": 2,
+        "makespan": 16
+      },
+      {
+        "dag_idx": 3,
+        "makespan": 13
+      }
+    ]
+  },
+  "no_motif": {
+    "avg_latency": 15.94,
+    "std_latency": 6.827620376090047,
+    "per_graph": [
+      {
+        "dag_idx": 0,
+        "makespan": 19
+      },
+      {
+        "dag_idx": 1,
+        "makespan": 17
+      },
+      {
+        "dag_idx": 2,
+        "makespan": 16
+      },
+      {
+        "dag_idx": 3,
+        "makespan": 13
+      }
+    ]
+  },
+  "random_kernel": {
+    "avg_latency": 15.94,
+    "std_latency": 6.827620376090047,
+    "per_graph": [
+      {
+        "dag_idx": 0,
+        "makespan": 19
+      },
+      {
+        "dag_idx": 1,
+        "makespan": 17
+      },
+      {
+        "dag_idx": 2,
+        "makespan": 16
+      },
+      {
+        "dag_idx": 3,
+        "makespan": 13
+      }
+    ]
+  },
+  "baseline": {
+    "avg_latency": 17.3,
+    "std_latency": 7.907591289387685
+  }
+}

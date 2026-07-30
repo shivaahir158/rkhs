@@ -1,0 +1,26 @@
+[
+  {
+    "iteration": 0,
+    "avg_latency": 16.14,
+    "std_latency": 6.9627867984019165,
+    "avg_runtime_ms": 0.17564241774380207,
+    "j_bar": -16.141756424177437,
+    "code": "pi(v) = 0.5*crit(v) + 1.0*fanout(v) - 0.3*level(v)"
+  },
+  {
+    "iteration": 1,
+    "avg_latency": 16.02,
+    "std_latency": 6.984239400249679,
+    "avg_runtime_ms": 0.17546360846608877,
+    "j_bar": -16.021754636084662,
+    "code": "def priority(v, features, dag):\n    f = features[v]\n    alpha = 0.7  # weight for criticality\n    alpha2 = 0.2  # weight for reconvergence\n    alpha3 = 0.1  # weight for fanout\n    crit = f[\"crit\"]\n    reconvergence = f[\"reconvergence\"]\n    fanout = f[\"fanout\"]\n    score = alpha*crit + alpha2*reconvergence + alpha3*fanout\n    return score"
+  },
+  {
+    "iteration": 2,
+    "avg_latency": 16.12,
+    "std_latency": 7.001828332657121,
+    "avg_runtime_ms": 0.19672535825520754,
+    "j_bar": -16.121967253582554,
+    "code": "def priority(v, features, dag):\n    f = features[v]\n    alpha, alpha2, alpha3 = 0.5, 0.2, 0.3\n    crit = f[\"crit\"]\n    fanout = f[\"fanout\"]\n    R = f[\"reconvergence\"]\n    score = alpha*crit + alpha2*R + alpha3*fanout\n    return score"
+  }
+]
