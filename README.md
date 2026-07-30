@@ -2,7 +2,7 @@
 
 **A Structured Methodology Using Large Language Models for Hardware Design**
 
-Implementation of the RKHS framework from [arXiv:2604.26153v1](https://arxiv.org/abs/2604.26153), which synthesizes reusable optimization heuristics for resource-constrained list scheduling in high-level synthesis (HLS) using retrieval-augmented generation (RAG), compact kernel heuristic templates, and an LLM-driven refinement loop.
+Implementation of the RKHS framework, check out our work at [arXiv:2604.26153v1](https://arxiv.org/abs/2604.26153), which synthesizes reusable optimization heuristics for resource-constrained list scheduling in high-level synthesis (HLS) using retrieval-augmented generation (RAG), compact kernel heuristic templates, and an LLM-driven refinement loop.
 
 ---
 
