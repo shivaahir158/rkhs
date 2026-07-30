@@ -9,7 +9,7 @@ Implementation of the RKHS framework, check out our work at [arXiv:2604.26153v1]
 > **If you find our work useful and want to build on it for your own ideas, please cite us:**
 >
 > ```bibtex
-> @article{ahir2025rkhs,
+> @article{ahir2026rkhs,
 >   title={RAG-Enhanced Kernel-Based Heuristic Synthesis (RKHS):
 >          A Structured Methodology Using Large Language Models
 >          for Hardware Design},
